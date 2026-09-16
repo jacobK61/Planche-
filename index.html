@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Planche — retouche photo par lot</title>
+<meta name="theme-color" content="#2F6E6B" />
+<meta name="description" content="Retouche automatique et naturelle de lots de photos, avec export haute résolution." />
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" href="icon-192.png" />
+<link rel="apple-touch-icon" href="icon-192.png" />
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+  :root{
+    --paper:#F2F1EA; --ink:#24261F; --muted:#5B5A50; --faint:#8B8A7E;
+    --line:#E7E4D9; --teal:#2F6E6B; --sand:#D8D5CC;
+  }
+  * { box-sizing: border-box; }
+  html,body{ margin:0; padding:0; background:var(--paper); color:var(--ink); font-family:'IBM Plex Mono', monospace; }
+  h1,h2,.display{ font-family:'Space Grotesk', sans-serif; }
+  .wrap{ max-width:480px; margin:0 auto; padding:0 20px 120px; }
+  header{ padding:32px 0 18px; }
+  header h1{ font-size:30px; font-weight:700; margin:0; }
+  header p{ font-size:14px; color:var(--muted); margin:8px 0 0; line-height:1.5; }
+  .dropzone{ width:100%; border:2px dashed var(--sand); background:#fff; border-radius:10px;
+    padding:40px 16px; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    cursor:pointer; text-align:center; }
+  .dropzone svg{ stroke:var(--teal); }
+  .dropzone .t1{ font-size:16px; font-weight:500; margin-top:12px; }
+  .dropzone .t2{ font-size:12px; color:var(--faint); margin-top:4px; }
+  input[type=file]{ display:none; }
+  .empty{ text-align:center; color:var(--faint); margin-top:40px; font-size:14px; }
+  .toolbar{ display:flex; align-items:center; justify-content:space-between; margin-top:24px; }
+  .count{ font-size:12px; color:var(--muted); }
+  .iconbtn{ width:34px; height:34px; border-radius:999px; border:none; background:var(--line);
+    display:flex; align-items:center; justify-content:center; cursor:pointer; }
+  .iconbtn.active{ background:var(--teal); }
+  .iconbtn svg{ stroke:var(--ink); }
+  .iconbtn.active svg{ stroke:#fff; }
+  .panel{ background:#fff; border:1px solid var(--line); border-radius:10px; padding:16px; margin-top:12px; }
+  .row{ margin-top:14px; }
+  .row:first-child{ margin-top:0; }
+  .row .label{ display:flex; align-items:center; justify-content:space-between; font-size:13px; }
+  .row .hint{ font-size:11px; color:var(--faint); margin-top:4px; }
+  input[type=range]{ width:100%; height:3px; background:var(--sand); border-radius:999px; appearance:none; margin-top:8px; }
+  input[type=range]::-webkit-slider-thumb{ appearance:none; width:16px; height:16px; border-radius:999px;
+    background:var(--teal); border:3px solid var(--paper); box-shadow:0 0 0 1px var(--teal); cursor:pointer; }
+  .switch{ position:relative; width:38px; height:22px; }
+  .switch input{ opacity:0; width:0; height:0; }
+  .slider-toggle{ position:absolute; inset:0; background:var(--sand); border-radius:999px; cursor:pointer; transition:.15s; }
+  .slider-toggle:before{ content:""; position:absolute; width:16px; height:16px; left:3px; top:3px; background:#fff; border-radius:999px; transition:.15s; }
+  input:checked + .slider-toggle{ background:var(--teal); }
+  input:checked + .slider-toggle:before{ transform:translateX(16px); }
+  .progress{ margin-top:16px; }
+  .progress-bar{ width:100%; height:6px; background:var(--line); border-radius:999px; overflow:hidden; }
+  .progress-fill{ height:100%; background:var(--teal); width:0%; transition:width .2s; }
+  .progress-label{ font-size:11px; color:var(--faint); margin-top:6px; }
+  .grid{ display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:18px; }
+  .card{ background:#fff; border:1px solid var(--line); border-radius:10px; overflow:hidden; }
+  .thumb{ position:relative; width:100%; aspect-ratio:1/1; background:var(--line); overflow:hidden; }
+  .thumb img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+  .thumb .cmp-line{ position:absolute; top:0; bottom:0; width:2px; background:#fff; }
+  .thumb input[type=range].cmp{ position:absolute; inset:0; width:100%; height:100%; margin:0; appearance:none; background:transparent; cursor:ew-resize; }
+  .thumb input[type=range].cmp::-webkit-slider-thumb{ appearance:none; width:26px; height:26px; border-radius:999px; background:#fff; border:2px solid var(--teal); cursor:ew-resize; }
+  .thumb .spin-overlay{ position:absolute; inset:0; background:rgba(36,38,31,.35); display:flex; align-items:center; justify-content:center; }
+  .card-foot{ padding:8px 10px; display:flex; align-items:center; justify-content:space-between; gap:6px; }
+  .card-foot .name{ font-size:11px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .card-foot .status{ font-size:11px; color:var(--sand); flex-shrink:0; }
+  .card-foot button{ flex-shrink:0; width:24px; height:24px; border-radius:999px; border:none; background:var(--line); cursor:pointer; display:flex; align-items:center; justify-content:center; }
+  .actionbar{ position:fixed; left:0; right:0; bottom:0; background:var(--paper); border-top:1px solid var(--line); }
+  .actionbar-inner{ max-width:480px; margin:0 auto; padding:12px 20px; display:flex; gap:8px; }
+  .btn-primary{ flex:1; border:none; border-radius:10px; padding:13px; font-family:'Space Grotesk',sans-serif; font-weight:500; font-size:14px; color:#fff; background:var(--teal); cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; }
+  .btn-primary:disabled{ background:var(--sand); cursor:default; }
+  .btn-dark{ border:none; border-radius:10px; padding:0 16px; background:var(--ink); cursor:pointer; display:flex; align-items:center; justify-content:center; }
+  .spin{ animation:spin .9s linear infinite; }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+  .install-note{ font-size:11px; color:var(--faint); margin-top:6px; line-height:1.5; }
+  .install-note button{ background:none; border:none; color:var(--teal); text-decoration:underline; cursor:pointer; font-family:inherit; font-size:11px; padding:0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Planche</h1>
+    <p>Retouche automatique par lot avec séparation de fréquences pour la peau, correction tonale et export haute résolution.</p>
+  </header>
+
+  <div class="dropzone" id="dropzone">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+    <div class="t1">Choisir des photos</div>
+    <div class="t2">jusqu'à 50 fichiers à la fois</div>
+  </div>
+  <input type="file" id="fileInput" accept="image/*" multiple />
+  <p class="install-note" id="installNote"></p>
+
+  <div class="empty" id="emptyState">Aucune photo pour le moment. Importe un lot pour commencer.</div>
+
+  <div id="controls" style="display:none">
+    <div class="toolbar">
+      <div class="count" id="countLabel"></div>
+      <div style="display:flex; gap:8px;">
+        <button class="iconbtn" id="settingsBtn" title="Réglages">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
+        </button>
+        <button class="iconbtn" id="resetBtn" title="Réinitialiser">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="panel" id="settingsPanel" style="display:none">
+      <div class="row">
+        <label class="label">
+          <span>Correction lumière et couleur auto</span>
+          <span class="switch"><input type="checkbox" id="autoLevels" checked><span class="slider-toggle"></span></span>
+        </label>
+      </div>
+      <div class="row">
+        <div class="label"><span>Ombres et hautes lumières</span><span id="toneVal">30%</span></div>
+        <input type="range" id="tone" min="0" max="80" value="30">
+        <div class="hint">éclaircit les ombres, récupère le détail dans les hautes lumières</div>
+      </div>
+      <div class="row">
+        <div class="label"><span>Vibrance</span><span id="satVal">+14%</span></div>
+        <input type="range" id="saturation" min="0" max="40" value="14">
+      </div>
+      <div class="row">
+        <div class="label"><span>Lissage de peau</span><span id="smoothVal">35%</span></div>
+        <input type="range" id="smoothing" min="0" max="80" value="35">
+        <div class="hint">séparation de fréquences : lisse le teint, garde le grain de peau</div>
+      </div>
+      <div class="row">
+        <div class="label"><span>Netteté (yeux, cheveux, matières)</span><span id="sharpVal">25%</span></div>
+        <input type="range" id="sharpen" min="0" max="60" value="25">
+      </div>
+      <div class="row">
+        <label class="label">
+          <span>Export en haute résolution</span>
+          <span class="switch"><input type="checkbox" id="highRes"><span class="slider-toggle"></span></span>
+        </label>
+        <div class="hint">retraite chaque photo à sa résolution d'origine (jusqu'à 4000px) au moment du téléchargement — plus lent</div>
+      </div>
+    </div>
+
+    <div class="progress" id="progressWrap" style="display:none">
+      <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+      <div class="progress-label" id="progressLabel"></div>
+    </div>
+
+    <div class="grid" id="grid"></div>
+  </div>
+</div>
+
+<div class="actionbar" id="actionbar" style="display:none">
+  <div class="actionbar-inner">
+    <button class="btn-primary" id="processBtn">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 4.6L18 9l-4.1 1.4L12 15l-1.9-4.6L6 9l4.1-1.4L12 3z"/></svg>
+      <span id="processLabel">Traiter tout</span>
+    </button>
+    <button class="btn-dark" id="downloadAllBtn" style="display:none">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+    </button>
+  </div>
+</div>
+
+<script>
+// ---------------------------------------------------------------
+// Moteur de retouche (canvas, 100% côté client)
+// ---------------------------------------------------------------
+function clamp(v){ return v<0?0:v>255?255:v; }
+
+function loadImage(src){
+  return new Promise((resolve,reject)=>{
+    const img=new Image();
+    img.onload=()=>resolve(img);
+    img.onerror=reject;
+    img.src=src;
+  });
+}
+function fileToDataUrl(file){
+  return new Promise((resolve,reject)=>{
+    const r=new FileReader();
+    r.onload=()=>resolve(r.result);
+    r.onerror=reject;
+    r.readAsDataURL(file);
+  });
+}
+function wait(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+function buildLevelsLUT(hist,total,clip){
+  const lowCount=total*clip, highCount=total*(1-clip);
+  let cum=0, lo=0, hi=255;
+  for(let i=0;i<256;i++){ cum+=hist[i]; if(cum>=lowCount){ lo=i; break; } }
+  cum=0;
+  for(let i=255;i>=0;i--){ cum+=hist[i]; if(cum>=total-highCount){ hi=i; break; } }
+  if(hi<=lo){ hi=255; lo=0; }
+  const lut=new Uint8ClampedArray(256);
+  for(let i=0;i<256;i++) lut[i]=clamp(((i-lo)/(hi-lo))*255);
+  return lut;
+}
+function computeAutoLevels(data,sampleStep){
+  const hR=new Array(256).fill(0), hG=new Array(256).fill(0), hB=new Array(256).fill(0);
+  let n=0;
+  for(let i=0;i<data.length;i+=4*sampleStep){ hR[data[i]]++; hG[data[i+1]]++; hB[data[i+2]]++; n++; }
+  return { r:buildLevelsLUT(hR,n,0.006), g:buildLevelsLUT(hG,n,0.006), b:buildLevelsLUT(hB,n,0.006) };
+}
+function identityLUT(){ const l=new Uint8ClampedArray(256); for(let i=0;i<256;i++) l[i]=i; return l; }
+
+// carte de peau (modèle elliptique YCbCr) -> transitions douces, sans seuil dur
+function skinWeight(r,g,b){
+  const cb=128-0.168736*r-0.331264*g+0.5*b;
+  const cr=128+0.5*r-0.418688*g-0.081312*b;
+  const cb0=113.7, cr0=155.3, a=25.4, bb=14.2, theta=2.53;
+  const cosT=Math.cos(theta), sinT=Math.sin(theta);
+  const x=cosT*(cb-cb0)+sinT*(cr-cr0);
+  const y=-sinT*(cb-cb0)+cosT*(cr-cr0);
+  const val=(x*x)/(a*a)+(y*y)/(bb*bb);
+  if(val<=1) return 1;
+  const w=Math.exp(-(val-1)*1.6);
+  return w<0.02?0:w;
+}
+
+function blurImageData(sourceCanvas,width,height,smallScale){
+  const sw=Math.max(2,Math.round(width*smallScale));
+  const sh=Math.max(2,Math.round(height*smallScale));
+  const small=document.createElement('canvas'); small.width=sw; small.height=sh;
+  const sctx=small.getContext('2d');
+  sctx.imageSmoothingEnabled=true; sctx.imageSmoothingQuality='high';
+  sctx.drawImage(sourceCanvas,0,0,sw,sh);
+  const back=document.createElement('canvas'); back.width=width; back.height=height;
+  const bctx=back.getContext('2d');
+  bctx.imageSmoothingEnabled=true; bctx.imageSmoothingQuality='high';
+  bctx.drawImage(small,0,0,width,height);
+  return { canvas:back, data:bctx.getImageData(0,0,width,height) };
+}
+
+// correction ombres/hautes lumières préservant la teinte (ajustement additif sur la luminance)
+function toneCurvePass(data, shadowAmt, highlightAmt){
+  for(let i=0;i<data.length;i+=4){
+    const r=data[i], g=data[i+1], b=data[i+2];
+    const L=0.299*r+0.587*g+0.114*b;
+    const t=L/255;
+    let t2=t + shadowAmt*Math.pow(1-t,2)*t*1.8;
+    t2=t2 - highlightAmt*Math.pow(t2,3)*0.55;
+    const newL=clamp(t2*255);
+    const delta=newL-L;
+    data[i]=clamp(r+delta); data[i+1]=clamp(g+delta); data[i+2]=clamp(b+delta);
+  }
+}
+
+async function retouchPhoto(dataUrl, settings, maxDim){
+  const img=await loadImage(dataUrl);
+  let w=img.width, h=img.height;
+  const scale=Math.min(1, maxDim/Math.max(w,h));
+  w=Math.round(w*scale); h=Math.round(h*scale);
+
+  const canvas=document.createElement('canvas'); canvas.width=w; canvas.height=h;
+  const ctx=canvas.getContext('2d');
+  ctx.drawImage(img,0,0,w,h);
+  const imageData=ctx.getImageData(0,0,w,h);
+  const data=imageData.data;
+
+  // 1) niveaux auto + vibrance
+  const luts=settings.autoLevels ? computeAutoLevels(data,4) : { r:identityLUT(), g:identityLUT(), b:identityLUT() };
+  const satFactor=settings.saturation/100;
+  for(let i=0;i<data.length;i+=4){
+    const r=luts.r[data[i]], g=luts.g[data[i+1]], b=luts.b[data[i+2]];
+    const maxC=Math.max(r,g,b), minC=Math.min(r,g,b);
+    const currentSat=(maxC-minC)/255;
+    const vib=satFactor*(1-currentSat*0.6);
+    const gray=0.299*r+0.587*g+0.114*b;
+    data[i]=clamp(gray+(r-gray)*(1+vib));
+    data[i+1]=clamp(gray+(g-gray)*(1+vib));
+    data[i+2]=clamp(gray+(b-gray)*(1+vib));
+  }
+
+  // 2) ombres / hautes lumières
+  if(settings.tone>0) toneCurvePass(data, settings.tone/100*0.6, settings.tone/100*0.6);
+  ctx.putImageData(imageData,0,0);
+
+  // 3) séparation de fréquences (peau) + 4) netteté sélective
+  if(settings.smoothing>0 || settings.sharpen>0){
+    const toneScale=Math.max(0.04, 0.4-(0.36*settings.smoothing)/100);
+    const tone=blurImageData(canvas,w,h,toneScale);
+    const detail=blurImageData(canvas,w,h,0.5);
+    const td=tone.data.data, dd=detail.data.data;
+    const smoothAmt=settings.smoothing/100;
+    const sharpenAmt=settings.sharpen/100;
+    const detailRetain=0.4;
+
+    for(let i=0;i<data.length;i+=4){
+      const r=data[i], g=data[i+1], b=data[i+2];
+      const sw=skinWeight(r,g,b);
+      if(sw>0 && smoothAmt>0){
+        const detR=r-dd[i], detG=g-dd[i+1], detB=b-dd[i+2];
+        const skinR=td[i]*smoothAmt + r*(1-smoothAmt) + detR*detailRetain;
+        const skinG=td[i+1]*smoothAmt + g*(1-smoothAmt) + detG*detailRetain;
+        const skinB=td[i+2]*smoothAmt + b*(1-smoothAmt) + detB*detailRetain;
+        data[i]=clamp(r*(1-sw)+skinR*sw);
+        data[i+1]=clamp(g*(1-sw)+skinG*sw);
+        data[i+2]=clamp(b*(1-sw)+skinB*sw);
+      }
+      if(sharpenAmt>0){
+        const invSw=1-sw;
+        data[i]=clamp(data[i] + (r-dd[i])*sharpenAmt*invSw);
+        data[i+1]=clamp(data[i+1] + (g-dd[i+1])*sharpenAmt*invSw);
+        data[i+2]=clamp(data[i+2] + (b-dd[i+2])*sharpenAmt*invSw);
+      }
+    }
+    ctx.putImageData(imageData,0,0);
+  }
+
+  return canvas.toDataURL('image/jpeg', 0.94);
+}
+
+// ---------------------------------------------------------------
+// Interface
+// ---------------------------------------------------------------
+let uid=0;
+const photos=[]; // {id,name,original,processed,status,reveal,file}
+const settings={ autoLevels:true, tone:30, saturation:14, smoothing:35, sharpen:25, highRes:false };
+let isProcessing=false;
+
+const el=(id)=>document.getElementById(id);
+const dropzone=el('dropzone'), fileInput=el('fileInput'), emptyState=el('emptyState'),
+  controls=el('controls'), countLabel=el('countLabel'), grid=el('grid'),
+  actionbar=el('actionbar'), processBtn=el('processBtn'), processLabel=el('processLabel'),
+  downloadAllBtn=el('downloadAllBtn'), settingsBtn=el('settingsBtn'), settingsPanel=el('settingsPanel'),
+  resetBtn=el('resetBtn'), progressWrap=el('progressWrap'), progressFill=el('progressFill'),
+  progressLabel=el('progressLabel');
+
+dropzone.addEventListener('click', ()=>fileInput.click());
+fileInput.addEventListener('change', (e)=>{ if(e.target.files.length) handleFiles(e.target.files); fileInput.value=''; });
+
+settingsBtn.addEventListener('click', ()=>{
+  const show=settingsPanel.style.display==='none';
+  settingsPanel.style.display=show?'block':'none';
+  settingsBtn.classList.toggle('active',show);
+});
+
+['tone','saturation','smoothing','sharpen'].forEach((key)=>{
+  const input=el(key);
+  input.addEventListener('input', ()=>{
+    settings[key]=Number(input.value);
+    const labelMap={tone:'toneVal',saturation:'satVal',smoothing:'smoothVal',sharpen:'sharpVal'};
+    const suffix = key==='saturation' ? `+${input.value}%` : `${input.value}%`;
+    el(labelMap[key]).textContent=suffix;
+  });
+});
+el('autoLevels').addEventListener('change', (e)=>{ settings.autoLevels=e.target.checked; });
+el('highRes').addEventListener('change', (e)=>{ settings.highRes=e.target.checked; });
+
+resetBtn.addEventListener('click', ()=>{
+  photos.length=0; render();
+});
+
+async function handleFiles(fileList){
+  const files=Array.from(fileList).filter(f=>f.type.startsWith('image/'));
+  for(const f of files){
+    const original=await fileToDataUrl(f);
+    photos.push({ id:'p'+(++uid), name:f.name, original, processed:null, status:'attente', reveal:50, file:f });
+  }
+  render();
+}
+
+function render(){
+  const has=photos.length>0;
+  emptyState.style.display=has?'none':'block';
+  controls.style.display=has?'block':'none';
+  actionbar.style.display=has?'block':'none';
+  countLabel.textContent = has ? `${photos.length} photo${photos.length>1?'s':''} · ${photos.filter(p=>p.status==='terminé').length} traitée(s)` : '';
+
+  grid.innerHTML='';
+  photos.forEach(photo=>{
+    const card=document.createElement('div'); card.className='card';
+    const thumb=document.createElement('div'); thumb.className='thumb';
+    const imgOrig=document.createElement('img'); imgOrig.src=photo.original;
+    thumb.appendChild(imgOrig);
+    if(photo.processed){
+      const imgProc=document.createElement('img'); imgProc.src=photo.processed;
+      imgProc.style.clipPath=`inset(0 ${100-photo.reveal}% 0 0)`;
+      thumb.appendChild(imgProc);
+      const line=document.createElement('div'); line.className='cmp-line'; line.style.left=photo.reveal+'%';
+      thumb.appendChild(line);
+      const range=document.createElement('input');
+      range.type='range'; range.className='cmp'; range.min=0; range.max=100; range.value=photo.reveal;
+      range.addEventListener('input', (e)=>{ photo.reveal=Number(e.target.value); imgProc.style.clipPath=`inset(0 ${100-photo.reveal}% 0 0)`; line.style.left=photo.reveal+'%'; });
+      thumb.appendChild(range);
+    }
+    if(photo.status==='en cours'){
+      const overlay=document.createElement('div'); overlay.className='spin-overlay';
+      overlay.innerHTML='<svg class="spin" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-9-9"/></svg>';
+      thumb.appendChild(overlay);
+    }
+    card.appendChild(thumb);
+    const foot=document.createElement('div'); foot.className='card-foot';
+    const name=document.createElement('span'); name.className='name'; name.textContent=photo.name; name.title=photo.name;
+    foot.appendChild(name);
+    if(photo.processed){
+      const btn=document.createElement('button');
+      btn.innerHTML='<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#24261F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
+      btn.addEventListener('click', ()=>downloadOne(photo));
+      foot.appendChild(btn);
+    } else {
+      const status=document.createElement('span'); status.className='status'; status.textContent=photo.status;
+      foot.appendChild(status);
+    }
+    card.appendChild(foot);
+    grid.appendChild(card);
+  });
+
+  const doneCount=photos.filter(p=>p.status==='terminé').length;
+  processBtn.disabled = isProcessing || (has && doneCount===photos.length);
+  processLabel.textContent = isProcessing ? 'Traitement en cours' : (doneCount===photos.length && has) ? 'Tout est traité' : 'Traiter tout';
+  downloadAllBtn.style.display = doneCount>0 ? 'flex' : 'none';
+}
+
+async function downloadOne(photo, highResOverride){
+  let url=photo.processed;
+  if(highResOverride || settings.highRes){
+    processLabel.textContent='Export en cours…';
+    url=await retouchPhoto(photo.original, settings, 4000);
+  }
+  const a=document.createElement('a');
+  a.href=url;
+  a.download='retouche_'+photo.name.replace(/\.[^/.]+$/,'')+'.jpg';
+  document.body.appendChild(a); a.click(); a.remove();
+  render();
+}
+
+processBtn.addEventListener('click', async ()=>{
+  isProcessing=true; render();
+  const targets=photos.filter(p=>p.status!=='terminé');
+  progressWrap.style.display='block';
+  progressFill.style.width='0%';
+  progressLabel.textContent=`0/${targets.length} traitées`;
+  for(let i=0;i<targets.length;i++){
+    const t=targets[i];
+    t.status='en cours'; render();
+    await wait(0);
+    try{
+      t.processed=await retouchPhoto(t.original, settings, 1000);
+      t.status='terminé';
+    }catch(e){ t.status='échec'; }
+    render();
+    progressFill.style.width=((i+1)/targets.length*100)+'%';
+    progressLabel.textContent=`${i+1}/${targets.length} traitées`;
+  }
+  isProcessing=false; render();
+});
+
+downloadAllBtn.addEventListener('click', async ()=>{
+  const done=photos.filter(p=>p.processed);
+  for(let i=0;i<done.length;i++){ await downloadOne(done[i]); await wait(400); }
+});
+
+// ---------------------------------------------------------------
+// PWA : service worker + invite d'installation
+// ---------------------------------------------------------------
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('service-worker.js').catch(()=>{});
+  });
+}
+let deferredPrompt=null;
+window.addEventListener('beforeinstallprompt', (e)=>{
+  e.preventDefault();
+  deferredPrompt=e;
+  const note=el('installNote');
+  note.innerHTML='Cette page peut être installée comme une application. <button id="installBtn">Installer Planche</button>';
+  el('installBtn').addEventListener('click', async ()=>{
+    deferredPrompt.prompt();
+    await deferredPrompt.userChoice;
+    deferredPrompt=null;
+    note.textContent='';
+  });
+});
+
+render();
+</script>
+</body>
+</html>
